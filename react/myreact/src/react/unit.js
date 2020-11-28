@@ -5,7 +5,7 @@ class Unit {    // 通过父类保存参数
         this.currentElement = element
     }
 }
-
+// 负责渲染文本节点
 class ReactTextUnit extends Unit{
     getMarkUp(rootId){   //保存当前元素的Id
         this._rootId = rootId
@@ -13,7 +13,7 @@ class ReactTextUnit extends Unit{
         return `<span data-reactid="${rootId}">${this.currentElement}</span>`
     }
 }
-
+// 负责渲染原生节点
 class ReactNativeUnit extends Unit{
     getMarkUp(rootId){
         this._rootId = rootId;
@@ -43,6 +43,28 @@ class ReactNativeUnit extends Unit{
         return tagStart + '>' + contentStr + tagEnd
     }
 }
+// 负责渲染React组件
+class ReactCompositUnit extends Unit{
+    getMarkUp(rootId){
+        this._rootId = rootId;
+        let {type:Component,props} = this.currentElement;
+        let componentInstance = new Component(props);
+        // componentWillMount钩子函数执行
+        componentInstance.componentWillMount && componentInstance.componentWillMount()
+        // 调用render后返回的结果
+        let reactComponentRenderer = componentInstance.render();
+        // 递归渲染组件render后的返回结果
+        let ReactCompositUnitInstance = createReactUnit(reactComponentRenderer);
+        // 先序深度优先，有儿子就进去，树的遍历
+        let markUp = ReactCompositUnitInstance.getMarkUp(rootId);
+        // 在递归后绑定事件，儿子先绑定成功，再绑定父亲
+        $(document).on('mounted',()=>{
+            // 在递归的阶段挂载 componentDidMount生命周期钩子函数
+            componentInstance.componentDidMount && componentInstance.componentDidMount()
+        })
+        return markUp
+    }
+}
 
 function createReactUnit(element){
     // console.log(element);
@@ -51,6 +73,9 @@ function createReactUnit(element){
     }
     if(typeof element === 'object' && typeof element.type === 'string'){
         return new ReactNativeUnit(element);
+    }
+    if(typeof element === 'object' && typeof element.type === 'function'){
+        return new ReactCompositUnit(element);
     }
 }
 
